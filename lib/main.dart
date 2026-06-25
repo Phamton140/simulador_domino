@@ -272,7 +272,7 @@ class _GameScreenState extends State<GameScreen> {
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       transform: isPlayable ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
-                      child: _buildDomino(d.val1, d.val2, 'column', 40, 80),
+                      child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
                     ),
                   ),
                 );
