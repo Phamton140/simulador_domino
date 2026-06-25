@@ -144,16 +144,46 @@ class GameEngine {
 
   List<Map<String, dynamic>> getValidMoves(int playerIndex) {
     List<Map<String, dynamic>> moves = [];
+    
+    // Regla profesional: si ambos extremos de la mesa son iguales,
+    // se debe jugar obligatoriamente por el extremo más cercano al jugador.
+    bool bothEndsSame = ends[1]!.openValue == ends[2]!.openValue;
+    int preferredEnd = -1;
+    if (bothEndsSame) {
+      double dist1 = _getDistanceFromPlayer(1, playerIndex);
+      double dist2 = _getDistanceFromPlayer(2, playerIndex);
+      preferredEnd = dist1 <= dist2 ? 1 : 2;
+    }
+
     for (int i = 0; i < hands[playerIndex].length; i++) {
       Domino d = hands[playerIndex][i];
-      if (d.matches(ends[1]!.openValue)) {
-        moves.add({'dominoIndex': i, 'end': 1});
-      }
-      if (d.matches(ends[2]!.openValue)) {
-        moves.add({'dominoIndex': i, 'end': 2});
+      bool matches1 = d.matches(ends[1]!.openValue);
+      bool matches2 = d.matches(ends[2]!.openValue);
+
+      if (bothEndsSame && matches1) {
+         moves.add({'dominoIndex': i, 'end': preferredEnd});
+      } else {
+         if (matches1) moves.add({'dominoIndex': i, 'end': 1});
+         if (matches2) moves.add({'dominoIndex': i, 'end': 2});
       }
     }
     return moves;
+  }
+
+  double _getDistanceFromPlayer(int endId, int playerIndex) {
+    EndState end = ends[endId]!;
+    // Player 0 (South) -> (cx, tableH)
+    // Player 1 (East)  -> (tableW, cy)
+    // Player 2 (North) -> (cx, 0)
+    // Player 3 (West)  -> (0, cy)
+    double px = tableW / 2;
+    double py = tableH / 2;
+    if (playerIndex == 0) py = tableH;
+    else if (playerIndex == 1) px = tableW;
+    else if (playerIndex == 2) py = 0;
+    else if (playerIndex == 3) px = 0;
+
+    return sqrt(pow(end.x - px, 2) + pow(end.y - py, 2));
   }
 
   void playMove(int playerIndex, int dominoIndex, int endId) {
