@@ -53,6 +53,9 @@ class GameEngine {
   Map<int, EndState> ends = {};
   
   int currentPlayer = -1;
+  int starterPlayer = -1;       // Quién colocó el doble inicial
+  bool _rightSideRuleActive = false; // Regla: jugar por la derecha tras un doble inicial
+  int _forcedEndId = -1;        // Extremo forzado mientras la regla esté activa
   Function()? onStateChanged;
   Function(int)? onTurnStart;
 
@@ -89,12 +92,21 @@ class GameEngine {
 
     // Find who has Double 6
     currentPlayer = -1;
+    _rightSideRuleActive = false;
+    _forcedEndId = -1;
     for (int i = 0; i < 4; i++) {
       int idx = hands[i].indexWhere((d) => d.val1 == 6 && d.val2 == 6);
       if (idx != -1) {
         currentPlayer = i;
+        starterPlayer = i;
         Domino d6 = hands[i].removeAt(idx);
-        _placeInitialDouble6(d6, i); // pasamos quién sale
+        _placeInitialDouble6(d6, i);
+        // Activar la regla del extremo derecho si la primera ficha es un doble
+        if (d6.isDouble) {
+          _rightSideRuleActive = true;
+          int secondPlayer = (starterPlayer + 1) % 4;
+          _forcedEndId = _getSecondMoveEnd(secondPlayer);
+        }
         break;
       }
     }
@@ -167,9 +179,23 @@ class GameEngine {
 
   List<Map<String, dynamic>> getValidMoves(int playerIndex) {
     List<Map<String, dynamic>> moves = [];
-    
-    // Regla profesional: si ambos extremos de la mesa son iguales,
-    // se debe jugar obligatoriamente por el extremo más cercano al jugador.
+
+    // REGLA PROFESIONAL PERSISTENTE: Mientras _rightSideRuleActive sea true,
+    // todos los jugadores deben intentar jugar por el extremo forzado (_forcedEndId).
+    // La regla se mantiene aunque varios jugadores pasen consecutivamente.
+    // Solo se libera cuando alguien logra colocar una ficha en ese extremo.
+    if (_rightSideRuleActive && _forcedEndId != -1) {
+      for (int i = 0; i < hands[playerIndex].length; i++) {
+        Domino d = hands[playerIndex][i];
+        if (d.matches(ends[_forcedEndId]!.openValue)) {
+          moves.add({'dominoIndex': i, 'end': _forcedEndId});
+        }
+      }
+      return moves; // Si está vacío = pasa el turno, la regla sigue activa
+    }
+
+    // Regla general: si ambos extremos de la mesa son iguales,
+    // jugar obligatoriamente por el extremo más cercano.
     bool bothEndsSame = ends[1]!.openValue == ends[2]!.openValue;
     int preferredEnd = -1;
     if (bothEndsSame) {
@@ -191,6 +217,20 @@ class GameEngine {
       }
     }
     return moves;
+  }
+
+  /// Retorna el extremo forzado para el segundo jugador.
+  /// "Derecha" según la posición física de cada jugador mirando al centro:
+  /// ends[1] = Norte o Crecimiento↑/← / ends[2] = Sur o Crecimiento↓/→
+  int _getSecondMoveEnd(int playerIndex) {
+    // Tabla fija basada en quién sale y quién juega segundo
+    // Turno antihorario: Sur(0)→Este(1)→Norte(2)→Oeste(3)
+    if (starterPlayer == 0 && playerIndex == 1) return 1; // Sur sale → Este juega: derecha=Norte(end1)
+    if (starterPlayer == 2 && playerIndex == 3) return 2; // Norte sale → Oeste juega: derecha=Sur(end2)
+    if (starterPlayer == 1 && playerIndex == 2) return 1; // Este sale → Norte juega: derecha=Oeste(end1)
+    if (starterPlayer == 3 && playerIndex == 0) return 2; // Oeste sale → Sur juega: derecha=Este(end2)
+    // Fallback: extremo más cercano
+    return getClosestEndForPlayer(playerIndex);
   }
 
   double _getDistanceFromPlayer(int endId, int playerIndex) {
@@ -216,6 +256,12 @@ class GameEngine {
   }
 
   void playMove(int playerIndex, int dominoIndex, int endId) {
+    // Si alguien logra jugar en el extremo forzado, se libera la regla
+    if (_rightSideRuleActive && endId == _forcedEndId) {
+      _rightSideRuleActive = false;
+      _forcedEndId = -1;
+    }
+
     Domino d = hands[playerIndex].removeAt(dominoIndex);
     EndState end = ends[endId]!;
 
