@@ -111,8 +111,12 @@ class _GameScreenState extends State<GameScreen> {
           child: Container(
             width: 4.5, height: 4.5,
             decoration: BoxDecoration(
-              color: active[i] ? Colors.black : Colors.transparent,
+              color: active[i] ? const Color(0xFF1A1A1A) : Colors.transparent,
               shape: BoxShape.circle,
+              boxShadow: active[i] ? const [
+                // Un pequeño brillo inferior para simular hendidura 3D en el punto
+                BoxShadow(color: Colors.white54, offset: Offset(0.5, 0.5), blurRadius: 0.5)
+              ] : null,
             ),
           ),
         )
@@ -133,24 +137,36 @@ class _GameScreenState extends State<GameScreen> {
       width: w,
       height: h,
       decoration: BoxDecoration(
-        color: const Color(0xFFfdfdfd),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFFFFFFA), // Reflejo de luz (blanco tiza)
+            Color(0xFFF5F0E1), // Color base Marfil
+            Color(0xFFE3DAC1), // Sombra inferior del material
+          ],
+          stops: [0.0, 0.6, 1.0],
+        ),
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFFD1C7AC), width: 0.5), // Borde suave
         boxShadow: const [
-          BoxShadow(color: Colors.black54, offset: Offset(1, 1), blurRadius: 2)
+          // Sombra doble para dar grosor y altura a la ficha
+          BoxShadow(color: Colors.black54, offset: Offset(1.5, 1.5), blurRadius: 3),
+          BoxShadow(color: Colors.black26, offset: Offset(3, 3), blurRadius: 6),
         ]
       ),
       child: flexDir == 'column' 
         ? Column(
             children: [
               Expanded(child: _buildDots(val1)),
-              Container(height: 1, color: Colors.grey),
+              Container(height: 1.5, color: const Color(0xFFC4B89A)), // Surco central
               Expanded(child: _buildDots(val2)),
             ],
           )
         : Row(
             children: [
               Expanded(child: _buildDots(val1)),
-              Container(width: 1, color: Colors.grey),
+              Container(width: 1.5, color: const Color(0xFFC4B89A)), // Surco central
               Expanded(child: _buildDots(val2)),
             ],
           ),
