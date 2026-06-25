@@ -149,11 +149,6 @@ class _GameScreenState extends State<GameScreen> {
         ),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: const Color(0xFFD1C7AC), width: 0.5), // Borde suave
-        boxShadow: const [
-          // Sombra doble para dar grosor y altura a la ficha
-          BoxShadow(color: Colors.black54, offset: Offset(1.5, 1.5), blurRadius: 3),
-          BoxShadow(color: Colors.black26, offset: Offset(3, 3), blurRadius: 6),
-        ]
       ),
       child: flexDir == 'column' 
         ? Column(
