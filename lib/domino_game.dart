@@ -94,7 +94,7 @@ class GameEngine {
       if (idx != -1) {
         currentPlayer = i;
         Domino d6 = hands[i].removeAt(idx);
-        _placeInitialDouble6(d6);
+        _placeInitialDouble6(d6, i); // pasamos quién sale
         break;
       }
     }
@@ -103,24 +103,47 @@ class GameEngine {
     nextTurn();
   }
 
-  void _placeInitialDouble6(Domino d6) {
+  void _placeInitialDouble6(Domino d6, int starterPlayer) {
     double cx = tableW / 2;
     double cy = tableH / 2;
-    double w = PIECE_L;
-    double h = PIECE_W;
-    double px = cx - w / 2;
-    double py = cy - h / 2;
 
-    PlacedDomino pd = PlacedDomino(
-      domino: d6,
-      x: px, y: py, width: w, height: h,
-      flexDir: 'row',
-      renderVal1: 6, renderVal2: 6
-    );
-    board.add(pd);
+    // Player 0 = Sur, 2 = Norte  → equipo Norte/Sur sale → doble horizontal, cadena vertical
+    // Player 1 = Este, 3 = Oeste → equipo Este/Oeste sale → doble vertical, cadena horizontal
+    bool isNorthSouthTeam = (starterPlayer == 0 || starterPlayer == 2);
 
-    ends[1] = EndState(6, cx, cy - h / 2, Point(0, -1), pd); // North
-    ends[2] = EndState(6, cx, cy + h / 2, Point(0, 1), pd); // South
+    double w, h;
+    String flexDir;
+    EndState end1, end2;
+
+    if (isNorthSouthTeam) {
+      // Doble HORIZONTAL (acostado), cadena crece Norte↑ y Sur↓
+      w = PIECE_L;
+      h = PIECE_W;
+      flexDir = 'row';
+      double px = cx - w / 2;
+      double py = cy - h / 2;
+      PlacedDomino pd = PlacedDomino(
+        domino: d6, x: px, y: py, width: w, height: h,
+        flexDir: flexDir, renderVal1: 6, renderVal2: 6,
+      );
+      board.add(pd);
+      ends[1] = EndState(6, cx, cy - h / 2, Point(0, -1), pd); // Norte ↑
+      ends[2] = EndState(6, cx, cy + h / 2, Point(0,  1), pd); // Sur   ↓
+    } else {
+      // Doble VERTICAL (parado), cadena crece Este→ y Oeste←
+      w = PIECE_W;
+      h = PIECE_L;
+      flexDir = 'column';
+      double px = cx - w / 2;
+      double py = cy - h / 2;
+      PlacedDomino pd = PlacedDomino(
+        domino: d6, x: px, y: py, width: w, height: h,
+        flexDir: flexDir, renderVal1: 6, renderVal2: 6,
+      );
+      board.add(pd);
+      ends[1] = EndState(6, cx - w / 2, cy, Point(-1, 0), pd); // Oeste ←
+      ends[2] = EndState(6, cx + w / 2, cy, Point( 1, 0), pd); // Este  →
+    }
   }
 
   void nextTurn() {
