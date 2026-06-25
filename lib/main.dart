@@ -34,6 +34,8 @@ class _GameScreenState extends State<GameScreen> {
   Timer? turnTimer;
   int timeLeft = 5;
   final GlobalKey _boardKey = GlobalKey();
+  bool _isDragging = false;
+  int _draggedIndex = -1;
 
   @override
   void initState() {
@@ -317,50 +319,99 @@ class _GameScreenState extends State<GameScreen> {
           ),
 
           // Mano del jugador (Sur / 0)
-          Container(
-            height: 100,
-            padding: const EdgeInsets.all(10),
-            color: Colors.black45,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: engine.hands[0].asMap().entries.map((entry) {
-                int idx = entry.key;
-                Domino d = entry.value;
-                bool isPlayable = engine.currentPlayer == 0 && validMoves.any((m) => m['dominoIndex'] == idx);
+          DragTarget<int>(
+            onWillAcceptWithDetails: (_) => true, // Siempre acepta para detectar el drop
+            onAcceptWithDetails: (_) {
+              // Soltó sobre la mano → cancelar jugada, no hacer nada
+              setState(() {
+                _isDragging = false;
+                _draggedIndex = -1;
+              });
+            },
+            builder: (context, candidateData, rejectedData) {
+              final bool cancelZoneActive = candidateData.isNotEmpty;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: 100,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cancelZoneActive
+                      ? Colors.red.withOpacity(0.35)
+                      : Colors.black45,
+                  border: cancelZoneActive
+                      ? Border(top: BorderSide(color: Colors.redAccent, width: 2))
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (cancelZoneActive)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
+                            SizedBox(width: 4),
+                            Text('Cancelar', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ...engine.hands[0].asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      Domino d = entry.value;
+                      bool isPlayable = engine.currentPlayer == 0 && validMoves.any((m) => m['dominoIndex'] == idx);
+                      bool isBeingDragged = _draggedIndex == idx;
 
-                final pieceWidget = AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 5),
-                  transform: isPlayable ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
-                  child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
-                );
+                      final pieceWidget = AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        transform: isPlayable && !isBeingDragged
+                            ? Matrix4.translationValues(0, -10, 0)
+                            : Matrix4.identity(),
+                        child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                      );
 
-                return GestureDetector(
-                  onTap: () => _onPlayerPieceTapped(idx, validMoves),
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: engine.currentPlayer == 0 ? (isPlayable ? 1.0 : 0.5) : 1.0,
-                    child: isPlayable
-                      ? Draggable<int>(
-                          data: idx,
-                          feedback: Opacity(
-                            opacity: 0.85,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
-                            ),
-                          ),
-                          childWhenDragging: Opacity(
-                            opacity: 0.3,
-                            child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
-                          ),
-                          child: pieceWidget,
-                        )
-                      : pieceWidget,
-                  ),
-                );
-              }).toList(),
-            ),
+                      return GestureDetector(
+                        onTap: () => _onPlayerPieceTapped(idx, validMoves),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: engine.currentPlayer == 0 ? (isPlayable ? 1.0 : 0.5) : 1.0,
+                          child: isPlayable
+                            ? Draggable<int>(
+                                data: idx,
+                                onDragStarted: () {
+                                  setState(() {
+                                    _isDragging = true;
+                                    _draggedIndex = idx;
+                                  });
+                                },
+                                onDragEnd: (_) {
+                                  setState(() {
+                                    _isDragging = false;
+                                    _draggedIndex = -1;
+                                  });
+                                },
+                                feedback: Material(
+                                  color: Colors.transparent,
+                                  child: Transform.scale(
+                                    scale: 1.15,
+                                    child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                                  ),
+                                ),
+                                childWhenDragging: Opacity(
+                                  opacity: 0.25,
+                                  child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                                ),
+                                child: pieceWidget,
+                              )
+                            : pieceWidget,
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              );
+            },
           )
         ],
       ),
