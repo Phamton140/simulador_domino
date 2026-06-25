@@ -60,8 +60,8 @@ class GameEngine {
   double tableH = 600;
   bool isInitialized = false;
 
-  static const double PIECE_L = 50;
-  static const double PIECE_W = 25;
+  static const double PIECE_L = 56;
+  static const double PIECE_W = 28;
   static const double MARGIN = 70; // Reducido un poco para aprovechar mejor pantallas pequeñas
 
   void initGame(double w, double h) {

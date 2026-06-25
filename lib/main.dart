@@ -109,7 +109,7 @@ class _GameScreenState extends State<GameScreen> {
       dots.add(
         Center(
           child: Container(
-            width: 6, height: 6,
+            width: 4.5, height: 4.5,
             decoration: BoxDecoration(
               color: active[i] ? Colors.black : Colors.transparent,
               shape: BoxShape.circle,
