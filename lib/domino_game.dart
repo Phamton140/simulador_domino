@@ -186,6 +186,12 @@ class GameEngine {
     return sqrt(pow(end.x - px, 2) + pow(end.y - py, 2));
   }
 
+  int getClosestEndForPlayer(int playerIndex) {
+    double dist1 = _getDistanceFromPlayer(1, playerIndex);
+    double dist2 = _getDistanceFromPlayer(2, playerIndex);
+    return dist1 <= dist2 ? 1 : 2;
+  }
+
   void playMove(int playerIndex, int dominoIndex, int endId) {
     Domino d = hands[playerIndex].removeAt(dominoIndex);
     EndState end = ends[endId]!;

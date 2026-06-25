@@ -33,6 +33,7 @@ class _GameScreenState extends State<GameScreen> {
   final GameEngine engine = GameEngine();
   Timer? turnTimer;
   int timeLeft = 5;
+  final GlobalKey _boardKey = GlobalKey();
 
   @override
   void initState() {
@@ -81,18 +82,50 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onPlayerPieceTapped(int index, List<Map<String, dynamic>> validMoves) {
     if (engine.currentPlayer != 0) return;
-
     var movesForPiece = validMoves.where((m) => m['dominoIndex'] == index).toList();
-    if (movesForPiece.isEmpty) return; // No es jugable
+    if (movesForPiece.isEmpty) return;
 
+    turnTimer?.cancel();
     if (movesForPiece.length == 1) {
-      turnTimer?.cancel();
       engine.playMove(0, movesForPiece.first['dominoIndex'], movesForPiece.first['end']);
     } else {
-      // Es jugable en ambos extremos. Podríamos preguntar, pero para hacerlo rápido elegimos el primero
-      turnTimer?.cancel();
-      engine.playMove(0, movesForPiece.first['dominoIndex'], movesForPiece.first['end']);
+      // Tap: juega por el extremo más cercano a la posición del jugador (Sur)
+      engine.playMove(0, movesForPiece.first['dominoIndex'],
+          engine.getClosestEndForPlayer(0));
     }
+  }
+
+  void _onDrop(int dominoIndex, Offset globalDropOffset, List<Map<String, dynamic>> validMoves) {
+    if (engine.currentPlayer != 0) return;
+    var movesForPiece = validMoves.where((m) => m['dominoIndex'] == dominoIndex).toList();
+    if (movesForPiece.isEmpty) return;
+
+    turnTimer?.cancel();
+    if (movesForPiece.length == 1) {
+      engine.playMove(0, dominoIndex, movesForPiece.first['end']);
+      return;
+    }
+
+    // Arrastrado: resolver por proximidad al punto donde se soltó
+    final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (boardBox == null) {
+      engine.playMove(0, dominoIndex, movesForPiece.first['end']);
+      return;
+    }
+    final Offset localDrop = boardBox.globalToLocal(globalDropOffset);
+
+    // Calcular distancia del punto de drop a cada extremo
+    final e1 = engine.ends[1]!;
+    final e2 = engine.ends[2]!;
+    final d1 = (Offset(e1.x, e1.y) - localDrop).distance;
+    final d2 = (Offset(e2.x, e2.y) - localDrop).distance;
+
+    final chosenEnd = d1 <= d2 ? 1 : 2;
+    // Verificar que la ficha efectivamente puede jugarse en ese extremo
+    final validEnd = movesForPiece.any((m) => m['end'] == chosenEnd)
+        ? chosenEnd
+        : movesForPiece.first['end'];
+    engine.playMove(0, dominoIndex, validEnd);
   }
 
   Widget _buildDots(int val) {
@@ -247,14 +280,35 @@ class _GameScreenState extends State<GameScreen> {
                         BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)
                       ]
                     ),
-                    child: Stack(
-                      children: engine.board.map((pd) {
-                        return Positioned(
-                          left: pd.x,
-                          top: pd.y,
-                          child: _buildDomino(pd.renderVal1, pd.renderVal2, pd.flexDir, pd.width, pd.height),
+                    child: DragTarget<int>(
+                      key: _boardKey,
+                      onWillAcceptWithDetails: (details) => engine.currentPlayer == 0,
+                      onAcceptWithDetails: (details) {
+                        _onDrop(details.data, details.offset, validMoves);
+                      },
+                      builder: (context, candidateData, rejectedData) {
+                        return Stack(
+                          children: [
+                            ...engine.board.map((pd) {
+                              return Positioned(
+                                left: pd.x,
+                                top: pd.y,
+                                child: _buildDomino(pd.renderVal1, pd.renderVal2, pd.flexDir, pd.width, pd.height),
+                              );
+                            }),
+                            // Indicador visual cuando se está arrastrando una ficha
+                            if (candidateData.isNotEmpty)
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                          ],
                         );
-                      }).toList(),
+                      },
                     ),
                   ),
                 );
@@ -273,18 +327,36 @@ class _GameScreenState extends State<GameScreen> {
                 int idx = entry.key;
                 Domino d = entry.value;
                 bool isPlayable = engine.currentPlayer == 0 && validMoves.any((m) => m['dominoIndex'] == idx);
-                
+
+                final pieceWidget = AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  transform: isPlayable ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
+                  child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                );
+
                 return GestureDetector(
                   onTap: () => _onPlayerPieceTapped(idx, validMoves),
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
                     opacity: engine.currentPlayer == 0 ? (isPlayable ? 1.0 : 0.5) : 1.0,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 5),
-                      transform: isPlayable ? Matrix4.translationValues(0, -10, 0) : Matrix4.identity(),
-                      child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
-                    ),
+                    child: isPlayable
+                      ? Draggable<int>(
+                          data: idx,
+                          feedback: Opacity(
+                            opacity: 0.85,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                            ),
+                          ),
+                          childWhenDragging: Opacity(
+                            opacity: 0.3,
+                            child: _buildDomino(d.val1, d.val2, 'column', GameEngine.PIECE_W, GameEngine.PIECE_L),
+                          ),
+                          child: pieceWidget,
+                        )
+                      : pieceWidget,
                   ),
                 );
               }).toList(),
